@@ -12,48 +12,59 @@ public class Evaluator
     {
         var postFix = string.Empty;
         var stack = new Stack<char>();
-        foreach (var item in infix)
+        var numberBuffer = string.Empty;
+
+        for (int i = 0; i < infix.Length; i++)
         {
-            if (IsOperator(item))
+            var item = infix[i];
+
+            if (char.IsDigit(item) || item == '.')
             {
-                if (stack.Count == 0)
+                numberBuffer += item;
+            }
+            else if (IsOperator(item))
+            {
+                if (!string.IsNullOrEmpty(numberBuffer))
+                {
+                    postFix += numberBuffer + " ";
+                    numberBuffer = string.Empty;
+                }
+
+                if (item == '(')
                 {
                     stack.Push(item);
                 }
-                else
+                else if (item == ')')
                 {
-                    if (item == ')')
+                    while (stack.Count > 0 && stack.Peek() != '(')
                     {
-                        do
-                        {
-                            postFix += stack.Pop();
-                        } while (stack.Peek() != '(');
-                        stack.Pop();
+                        postFix += stack.Pop() + " ";
                     }
-                    else
+                    if (stack.Count > 0 && stack.Peek() == '(')
+                        stack.Pop(); 
+                }
+                else 
+                {
+                    while (stack.Count > 0 && stack.Peek() != '(' &&
+                           PriorityStack(stack.Peek()) >= PriorityInfix(item))
                     {
-                        if (PriorityInfix(item) > PriorityStack(stack.Peek()))
-                        {
-                            stack.Push(item);
-                        }
-                        else
-                        {
-                            postFix += stack.Pop();
-                            stack.Push(item);
-                        }
+                        postFix += stack.Pop() + " ";
                     }
+                    stack.Push(item);
                 }
             }
-            else
-            {
-                postFix += item;
-            }
+        }
+
+        if (!string.IsNullOrEmpty(numberBuffer))
+        {
+            postFix += numberBuffer + " ";
         }
         while (stack.Count > 0)
         {
-            postFix += stack.Pop();
+            postFix += stack.Pop() + " ";
         }
-        return postFix;
+
+        return postFix.Trim();
     }
 
     private static int PriorityStack(char item) => item switch
@@ -74,20 +85,22 @@ public class Evaluator
         '/' => 2,
         '+' => 1,
         '-' => 1,
-        '(' => 5,
+        '(' => 0,
         _ => throw new Exception("Sintax error."),
     };
 
     private static double EvaluatePostfix(string postfix)
     {
         var stack = new Stack<double>();
-        foreach (char item in postfix)
+        string[] tokens = postfix.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (string token in tokens)
         {
-            if (IsOperator(item))
+            if (token.Length == 1 && IsOperator(token[0]) && token[0] != '(' && token[0] != ')')
             {
                 var b = stack.Pop();
                 var a = stack.Pop();
-                stack.Push(item switch
+                stack.Push(token[0] switch
                 {
                     '+' => a + b,
                     '-' => a - b,
@@ -99,7 +112,15 @@ public class Evaluator
             }
             else
             {
-                stack.Push(double.Parse(item.ToString()));
+                if (double.TryParse(token, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out double number))
+                {
+                    stack.Push(number);
+                }
+                else
+                {
+                    throw new Exception($"Sintax error: '{token}' is not a valid number or operator.");
+                }
             }
         }
         return stack.Pop();
